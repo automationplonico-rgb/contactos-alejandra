@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Guardar contacto</title>
+<style>
+:root{--bg:#f4f5f2;--card:#fff;--ink:#17201d;--mute:#66726d;--line:#dfe3df;--accent:#0f5c4d;--accent-ink:#fff;--ok:#0f5c4d;--warn:#8a5a00;--bad:#a12626}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:max(20px,env(safe-area-inset-top)) 16px 40px}
+main{max-width:460px;margin:0 auto}
+h1{font-size:22px;margin:8px 0 4px}
+p.sub{margin:0 0 18px;color:var(--mute);font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:#eceee9;padding:4px;border-radius:12px;margin-bottom:16px}
+.seg button{border:0;background:transparent;padding:12px 8px;border-radius:9px;font:inherit;font-weight:600;color:var(--mute);cursor:pointer;min-height:44px}
+.seg button[aria-pressed=true]{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+label{display:block;font-size:13px;font-weight:600;margin:14px 0 6px}
+label small{font-weight:400;color:var(--mute)}
+input,textarea{width:100%;font:inherit;padding:12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);min-height:46px}
+textarea{min-height:76px;resize:vertical}
+input:focus,textarea:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.go{width:100%;margin-top:18px;border:0;border-radius:12px;background:var(--accent);color:var(--accent-ink);font:inherit;font-weight:700;padding:14px;min-height:50px;cursor:pointer}
+.go[disabled]{opacity:.6;cursor:default}
+.msg{margin-top:14px;padding:12px 14px;border-radius:10px;font-size:15px;display:none}
+.msg.ok{display:block;background:#e6f2ee;color:var(--ok)}
+.msg.warn{display:block;background:#fbf1dc;color:var(--warn)}
+.msg.bad{display:block;background:#f8e3e3;color:var(--bad)}
+h2{font-size:14px;margin:26px 0 8px;color:var(--mute);text-transform:uppercase;letter-spacing:.04em}
+ul{list-style:none;margin:0;padding:0}
+li{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
+li:last-child{border:0}
+li span.t{color:var(--mute);white-space:nowrap}
+.tag{font-size:12px;font-weight:600}
+.lock{display:none}
+.link{background:none;border:0;color:var(--mute);font:inherit;font-size:13px;text-decoration:underline;cursor:pointer;margin-top:18px;padding:8px 0}
+</style>
+</head>
+<body>
+<main>
+  <h1>Guardar contacto</h1>
+  <p class="sub">Se guarda directamente en Google Contacts. Si el teléfono ya existe, no se duplica.</p>
+
+  <section class="card lock" id="lock">
+    <label for="key">Clave de acceso</label>
+    <input id="key" type="password" autocomplete="off" placeholder="Pega aquí la clave que te dieron">
+    <button class="go" id="keyGo" type="button">Entrar</button>
+  </section>
+
+  <section class="card" id="app">
+    <div class="seg" role="group" aria-label="Empresa">
+      <button type="button" data-space="mooveto" aria-pressed="true">Mooveto</button>
+      <button type="button" data-space="keen" aria-pressed="false">Keen Resources</button>
+    </div>
+    <form id="f" novalidate>
+      <label for="name">Nombre</label>
+      <input id="name" name="name" autocomplete="off" placeholder="Nombre y apellido">
+      <label for="phone">Teléfono</label>
+      <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="off" placeholder="07123 456789">
+      <label for="email">Email <small>(opcional)</small></label>
+      <input id="email" name="email" type="email" inputmode="email" autocomplete="off" placeholder="nombre@correo.com">
+      <label for="note">Nota <small>(opcional)</small></label>
+      <textarea id="note" name="note" placeholder="Qué necesita, de dónde viene..."></textarea>
+      <button class="go" id="go" type="submit">Guardar en Mooveto</button>
+    </form>
+    <div class="msg" id="msg" role="status" aria-live="polite"></div>
+  </section>
+
+  <h2 id="hh" style="display:none">Guardados en este dispositivo</h2>
+  <ul id="hist"></ul>
+  <button class="link" id="out" type="button" style="display:none">Cerrar sesión en este dispositivo</button>
+</main>
+<script>
+const ENDPOINT='https://n8n.alchimedia.co.uk/webhook/contactos-u7MJ1phy1ryM';
+const $=s=>document.querySelector(s);
+const LABEL={mooveto:'Mooveto',keen:'Keen Resources'};
+let space='mooveto';
+const getKey=()=>{try{return localStorage.getItem('ct.key')||''}catch(e){return ''}};
+const setKey=k=>{try{k?localStorage.setItem('ct.key',k):localStorage.removeItem('ct.key')}catch(e){}};
+const getHist=()=>{try{return JSON.parse(localStorage.getItem('ct.hist')||'[]')}catch(e){return []}};
+const addHist=h=>{try{localStorage.setItem('ct.hist',JSON.stringify([h].concat(getHist()).slice(0,15)))}catch(e){}};
+
+function show(){
+  const has=!!getKey();
+  $('#lock').style.display=has?'none':'block';
+  $('#app').style.display=has?'block':'none';
+  $('#out').style.display=has?'inline-block':'none';
+  renderHist();
+}
+function renderHist(){
+  const h=getHist(),has=!!getKey();
+  $('#hh').style.display=(has&&h.length)?'block':'none';
+  $('#hist').innerHTML=has?h.map(x=>`<li><div><b>${esc(x.name)}</b><br><span class="tag">${esc(LABEL[x.space])} · ${esc(x.phone)}${x.status==='exists'?' · ya existía':''}</span></div><span class="t">${esc(x.at)}</span></li>`).join(''):'';
+}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function say(kind,text){const m=$('#msg');m.className='msg '+kind;m.textContent=text}
+
+document.querySelectorAll('.seg button').forEach(b=>b.addEventListener('click',()=>{
+  space=b.dataset.space;
+  document.querySelectorAll('.seg button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+  $('#go').textContent='Guardar en '+LABEL[space];
+  $('#msg').className='msg';
+}));
+$('#keyGo').addEventListener('click',()=>{const k=$('#key').value.trim();if(k){setKey(k);$('#key').value='';show()}});
+$('#key').addEventListener('keydown',e=>{if(e.key==='Enter')$('#keyGo').click()});
+$('#out').addEventListener('click',()=>{setKey('');try{localStorage.removeItem('ct.hist')}catch(e){}show()});
+
+$('#f').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const body={key:getKey(),space,name:$('#name').value,phone:$('#phone').value,email:$('#email').value,note:$('#note').value};
+  if(body.name.trim().length<2){say('bad','Falta el nombre.');return}
+  if(body.phone.replace(/\D/g,'').length<7){say('bad','Falta el teléfono.');return}
+  const go=$('#go');go.disabled=true;const old=go.textContent;go.textContent='Guardando…';
+  try{
+    const r=await fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify(body)});
+    const d=await r.json();
+    if(d&&d.ok){
+      const at=new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+      addHist({name:d.name,phone:d.phone,space,status:d.status,at});
+      if(d.status==='exists')say('warn','Ese teléfono ya estaba en '+LABEL[space]+' ('+d.name+'). No se duplicó.');
+      else{say('ok','Guardado en '+LABEL[space]+': '+d.name);$('#f').reset()}
+      renderHist();
+    }else if(d&&d.code==='key'){setKey('');show();alert('La clave no es correcta. Pídele una nueva a Santiago.')}
+    else say('bad',(d&&d.error)||'No se pudo guardar. Inténtalo otra vez.');
+  }catch(err){say('bad','Sin conexión o el servidor no responde. No se guardó; inténtalo otra vez.')}
+  go.disabled=false;go.textContent=old;
+});
+show();
+</script>
+</body>
+</html>
